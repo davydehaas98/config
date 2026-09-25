@@ -1,0 +1,19 @@
+# Appearance
+font-family = JetBrains Mono Nerd Font
+font-size = 13
+theme = GitHub Dark High Contrast
+background-opacity = 0.90
+window-padding-x = 16
+window-padding-y = 16
+
+# Behavior
+copy-on-select = true
+confirm-close-surface = false
+mouse-hide-while-typing = true
+scrollback-limit = 10000
+
+# Shell integration
+shell-integration-features = cursor,sudo,title,ssh-env
+
+# use xterm-256color instead of xterm-ghostty so remote machines handle keys correctly
+# term = xterm-256color
