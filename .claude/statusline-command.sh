@@ -17,15 +17,17 @@ daily_tokens=$(jq --arg date "${today}" '
   (.dailyModelTokens // [])[] | select(.date == $date) | .tokensByModel | to_entries | map(.value) | add // 0
 ' ~/.claude/stats-cache.json 2>/dev/null)
 
-# "tot" cost: our own recomputed daily total, cached for 60s since scanning every
-# JSONL transcript on each prompt would be too slow to run live.
+# "tot" cost: our own recomputed daily total, cached since scanning every JSONL
+# transcript on each statusline redraw would be too slow to run live. Invalidated
+# by data (any today's transcript touched since the cache was written), not by a
+# fixed TTL, so it can't lag behind "cur" after a new message lands.
 daily_cost_cache=/tmp/claude_daily_cost_cache
 daily_cost=""
 if [ -f "${daily_cost_cache}" ]; then
   cache_line=$(cat "${daily_cost_cache}")
   cache_date="${cache_line%% *}"
-  cache_age=$(( $(date +%s) - $(date -r "${daily_cost_cache}" +%s 2>/dev/null || stat -c %Y "${daily_cost_cache}") ))
-  if [ "${cache_date}" = "${today}" ] && [ "${cache_age}" -lt 60 ]; then
+  stale=$(find ~/.claude/projects -name "*.jsonl" -newer "${daily_cost_cache}" -newermt "${today} 00:00:00" -print -quit 2>/dev/null)
+  if [ "${cache_date}" = "${today}" ] && [ -z "${stale}" ]; then
     daily_cost="${cache_line#* }"
   fi
 fi
