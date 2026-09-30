@@ -3,13 +3,14 @@
 input=$(cat)
 cwd=$(echo "${input}"    | jq -r '.cwd')
 model=$(echo "${input}"  | jq -r '.model.display_name')
+effort=$(echo "${input}" | jq -r '.effort.level // empty')
 total_cost_usd=$(echo "${input}" | jq -r '.cost.total_cost_usd // empty')
 used_pct_raw=$(echo "${input}" | jq -r '.context_window.used_percentage // empty')
 total_input_tokens=$(echo "${input}" | jq -r '.context_window.total_input_tokens // empty')
 ctx_window_size=$(echo "${input}" | jq -r '.context_window.context_window_size // empty')
 
-# "cur" cost: Claude Code's own reported cost for the current session.
-cost=$(echo "${total_cost_usd}" | awk '{if($1+0>0) printf "$%.4f", $1}')
+# Claude Code's own reported cost for the current session.
+cost=$(echo "${total_cost_usd}" | awk '{if($1+0>0) printf "$%.2f", $1}')
 
 today=$(date +%Y-%m-%d)
 # Total tokens used today across all sessions, from Claude Code's own stats cache.
@@ -17,10 +18,10 @@ daily_tokens=$(jq --arg date "${today}" '
   (.dailyModelTokens // [])[] | select(.date == $date) | .tokensByModel | to_entries | map(.value) | add // 0
 ' ~/.claude/stats-cache.json 2>/dev/null)
 
-# "tot" cost: our own recomputed daily total, cached since scanning every JSONL
-# transcript on each statusline redraw would be too slow to run live. Invalidated
-# by data (any today's transcript touched since the cache was written), not by a
-# fixed TTL, so it can't lag behind "cur" after a new message lands.
+# Our own recomputed daily total, cached since scanning every JSONL transcript
+# on each statusline redraw would be too slow to run live. Invalidated by data
+# (any today's transcript touched since the cache was written), not by a fixed
+# TTL, so it can't lag behind the session cost after a new message lands.
 daily_cost_cache=/tmp/claude_daily_cost_cache
 daily_cost=""
 if [ -f "${daily_cost_cache}" ]; then
@@ -96,12 +97,18 @@ sep="${grey} | ${reset}"
 # context-window usage, then today's total tokens, then cur/tot cost.
 printf -v bracket "${orange}%s${reset}" "${model}"
 
-# Context window usage for the current session, e.g. "ctx 50.0k/200.0k (25%)".
+# Reasoning effort level, e.g. "high".
+if [ -n "${effort}" ]; then
+  printf -v effort_part "${sep}${orange}%s${reset}" "${effort}"
+  bracket="${bracket}${effort_part}"
+fi
+
+# Context window usage for the current session, e.g. "50.0k/200.0k (25%)".
 if [ -n "${total_input_tokens}" ] && [ -n "${ctx_window_size}" ] && [ "${ctx_window_size}" != "0" ]; then
   tokens_used_fmt=$(format_k "${total_input_tokens}")
   tokens_total_fmt=$(format_k "${ctx_window_size}")
   used_pct=$(echo "${used_pct_raw}" | awk '{printf "%d", $1}')
-  printf -v ctx_part "${sep}${orange}ctx %s/%s (%s%%)${reset}" "${tokens_used_fmt}" "${tokens_total_fmt}" "${used_pct}"
+  printf -v ctx_part "${sep}${orange}%s/%s (%s%%)${reset}" "${tokens_used_fmt}" "${tokens_total_fmt}" "${used_pct}"
   bracket="${bracket}${ctx_part}"
 fi
 
@@ -117,15 +124,15 @@ fi
 daily_unrecognized="${daily_cost#*|}"
 daily_cost="${daily_cost%%|*}"
 
-daily_cost_fmt="\$0.0000"
+daily_cost_fmt="\$0.00"
 if [ -n "${daily_cost}" ] && awk -v c="${daily_cost}" 'BEGIN{exit !(c+0>0)}'; then
-  daily_cost_fmt=$(printf "\$%.4f" "${daily_cost}")
+  daily_cost_fmt=$(printf "\$%.2f" "${daily_cost}")
 fi
 if [ "${daily_unrecognized}" = "?" ]; then
   daily_cost_fmt="${daily_cost_fmt}?"
 fi
-# "cur" = this session's cost (from Claude Code), "tot" = our recomputed daily total.
-printf -v cost_part "${sep}${orange}cur %s${sep}${orange}tot %s${reset}" "${cost:-\$0.0000}" "${daily_cost_fmt}"
+# Session cost (from Claude Code) and today's recomputed total, unlabeled.
+printf -v cost_part "${sep}${orange}%s${sep}${orange}%s${reset}" "${cost:-\$0.00}" "${daily_cost_fmt}"
 bracket="${bracket}${cost_part}"
 
-printf "%s  ${grey}(${reset}%s${grey})${reset}" "${output}" "${bracket}"
+printf "%s\n%s\n" "${output}" "${bracket}"
