@@ -1,5 +1,10 @@
 # AGENTS
 
+## Git
+
+- NEVER commit or push code yourself (`git commit`, `git push`, or anything that lands/pushes code on the user's behalf). Always leave committing and pushing to the user.
+- NEVER use git worktrees.
+
 ## Style
 
 - **Spelling**: US English everywhere — code, identifiers, comments, strings, prose. (`normalize`, `color`, `behavior`, not `normalise`, `colour`, `behaviour`.)
