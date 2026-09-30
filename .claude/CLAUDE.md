@@ -2,10 +2,6 @@
 
 @~/AGENTS.md
 
-## Git
-
-- NEVER use git worktrees.
-
 ## Subagent model selection
 
 - Simple, read-only lookups (find a file, grep a symbol, check if something exists) → default to **Haiku**.
